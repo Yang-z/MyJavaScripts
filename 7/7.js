@@ -17,25 +17,26 @@ Response.prototype.raw = function() {
                     requestId: this._request._requestId
                 }
             );
-            console.log(typeof(response));
-            console.log(typeof(response.body))
+            // console.log(typeof(response));
+            // console.log(typeof(response.body))
             return response.body;
         });
         }
         return this._contentPromise;
 };
-// ref:
-// https://github.com/puppeteer/puppeteer/issues/3372
-// it's for getting more date in headers,  
-// but not for getting raw response body
+/**⚠️
+ * ref:
+ * https://github.com/puppeteer/puppeteer/issues/3372
+ * it's for getting more date in headers,
+ * but failed to get raw response body in this content
+ */
 /** ********************************************************************** */
 
 const cache = JSON.parse(fs.readFileSync("./7/.cache/.json"));
-//console.log(cache);
+count = 0;
 
-
-(async () => {
-    const browser = await puppeteer.launch({
+async function launch_browser(){
+    return await puppeteer.launch({
         headless: false,
         defaultViewport: null,
         // devtools: true,
@@ -47,33 +48,42 @@ const cache = JSON.parse(fs.readFileSync("./7/.cache/.json"));
             "--disable-features=site-per-process",  // https://github.com/puppeteer/puppeteer/issues/4960
             // "--disable-infobars",
             // "--no-sandbox",
-            // "--user-data-dir=${cache.pyppeteer_args['userDataDir']}",
-            // "--profile-directory=${cache.pyppeteer_args['profileDir']}",
+            // `--user-data-dir=${cache.pyppeteer['userDataDir']}`,
+            // `--profile-directory=${cache.pyppeteer['profileDir']}`,
         ],   
     });
-
-    const page = (await browser.pages())[0]
-
-    // page.setDefaultNavigationTimeout(0); 
-
-    page.on("response", on_response);
-
-    await page.goto(cache.game.url);
-
-    await new Promise(r => setTimeout(r, 300000));
-
-    await browser.close();
-    console.log("async done.")
-})();
-
-
-const Amf_js = require('amf-js');
-const libamf = require('libamf');
-var Amf = require('amf');
-count = 0;
+};
 
 /**
- * 
+ * @param {puppeteer.Request} request
+ * @returns {null}
+ */
+async function on_interceptedRequest(request){
+    if(
+        request.method() == "POST"
+        && request.resourceType() == 'other'
+    ){
+        console.log(count++)
+        console.log(request);
+        try{
+            // console.log(Buffer.from(request.postData(), 'binary'));
+            // fs.writeFile(
+            //     "./7/.cache/amf/" + count, 
+            //     request.postData(), 
+            //     err=> {if(err) console.error(err)}
+            // );  // ✔️  unbroken amf!!!
+        }catch(e){
+            console.log(e);
+        }
+        
+        // response = request.response()
+        // console.log(response);  // null
+    };
+    // interceptedRequest.abort();
+    request.continue();
+};
+
+/**
  * @param {puppeteer.Response} response
  */
 async function on_response(response){
@@ -83,33 +93,64 @@ async function on_response(response){
         && response.headers().hasOwnProperty('content-type')
         && response.headers()['content-type'].search('amf') != -1
     ){
-        console.log(count++);
-        // console.log("content-length: " + response.headers()['content-length'])
+        console.log(count);
 
-        req_body = response.request().postData();
-        console.log(req_body);// broken for amf
+        // req_body = response.request().postData();
+        // console.log(req_body);// ❌ broken for amf
 
-        buffer = await response.buffer();
-        console.log(buffer);// broken for amf
+        console.log(`content-length: ${response.headers()['content-length']}`)
 
-        raw = await response.raw();  // already broken
-        console.log(raw);
+        raw = await response.raw();  // ❌ already broken
+        /** @var {Buffer} buffer */
+        raw_buffer = Buffer.from(raw, 'binary');  // ❌ useless 
+        console.log(`buffer length: ${raw_buffer.length}`)
+        console.log(raw_buffer)
+        // fs.writeFile(`./7/.cache/amf/${count}_res`, raw_buffer, err=> {if(err) console.error(err)})
+
+        // buffer = await response.buffer();
+        // console.log(buffer);// ❌ broken for amf
+
+        /**⚠️
+         * They are just not really raw date, see:
+         * https://bugs.chromium.org/p/chromium/issues/detail?id=771825
+         * 
+         * Raw response body is not avilable for current puppeteer api, see:
+         * https://github.com/puppeteer/puppeteer/issues/1191
+         * 
+         * A way to get raw response by using DTP, see:
+         * https://gist.github.com/jsoverson/638b63542863596c562ccefc3ae52d8f
+         */
         
-        // They are just not raw date, see:
-        // https://bugs.chromium.org/p/chromium/issues/detail?id=771825
-
-        buffer_byte = Buffer.from(raw, 'binary');  // useless 
-        
-        // console.log("amf.byteLength: " + amf.byteLength)
-        // fs.writeFile("./7/.cache/amf/" + count, buffer_byte, err=> {if(err) console.error(err)})
-        // console.log(amf);
-        try{
-            // var amf_de = Amf_js.deserialize(buffer_byte.buffer);
-            // var amf_de = libamf.deserialize(amf, libamf.ENCODING.AMF3);
-            // var amf_de = Amf.read(amf, 0);;
-            // console.log(amf_de);
-        }catch(error) {
-            console.error(error);;
-        }
+        // try{
+        //     // decode amf...
+        //     console.log(amf);
+        // }catch(error) {
+        //     console.error(error);;
+        // }
     }
+    // response.request().continue()
 }
+/** ********************************************************************** */
+
+(async function main(){
+
+    /** @var {puppeteer.Browser} browser */
+    const browser = await launch_browser();
+    
+    /** @var {puppeteer.Page} page */
+    var page = (await browser.pages())[0];
+
+    await page.setRequestInterception(true);
+
+    page.on("request", on_interceptedRequest);
+    page.on('response', on_response);
+    // intercepte response?
+
+    await page.goto(cache.game.url);
+
+    await new Promise(r => setTimeout(r, 300000));
+
+    await browser.close();
+    console.log("async done.")
+
+})()
