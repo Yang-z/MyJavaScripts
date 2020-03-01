@@ -60,20 +60,16 @@ async function launch_browser(){
  */
 async function on_interceptedRequest(request){
     if(
-        request.method() == "POST"
+        request.method() == 'POST'
         && request.resourceType() == 'other'
     ){
-        console.log(count++)
-        console.log(request);
+        console.log(++count);
+        // console.log(request);
+
         try{
-            // console.log(Buffer.from(request.postData(), 'binary'));
-            // fs.writeFile(
-            //     "./7/.cache/amf/" + count, 
-            //     request.postData(), 
-            //     err=> {if(err) console.error(err)}
-            // );  // ✔️  unbroken amf!!!
+            parseBodyString(request.postData(), "req");
         }catch(e){
-            console.log(e);
+            console.error(e);
         }
         
         // response = request.response()
@@ -96,19 +92,18 @@ async function on_response(response){
         console.log(count);
 
         // req_body = response.request().postData();
-        // console.log(req_body);// ❌ broken for amf
+        // console.log(req_body);  // ❌ broken for amf
 
         console.log(`content-length: ${response.headers()['content-length']}`)
 
-        raw = await response.raw();  // ❌ already broken
-        /** @var {Buffer} buffer */
-        raw_buffer = Buffer.from(raw, 'binary');  // ❌ useless 
+        var raw = await response.raw();  // ❌ already broken
+        var raw_buffer = Buffer.from(raw, 'binary');  // ❌ useless 
         console.log(`buffer length: ${raw_buffer.length}`)
         console.log(raw_buffer)
         // fs.writeFile(`./7/.cache/amf/${count}_res`, raw_buffer, err=> {if(err) console.error(err)})
 
         // buffer = await response.buffer();
-        // console.log(buffer);// ❌ broken for amf
+        // console.log(buffer);  // ❌ broken for amf
 
         /**⚠️
          * They are just not really raw date, see:
@@ -132,6 +127,55 @@ async function on_response(response){
 }
 /** ********************************************************************** */
 
+/**
+ * @param {String} str 
+ * @param {String} name
+ */
+function parseBodyString(str, name){
+    // var str = request.postData()
+    var dir = "./7/.cache/amf"
+    var file_path = `${dir}/${name}_${count}`
+
+    console.log(str);
+    fs.writeFile(`${file_path}_str`, str, err=> {if(err) console.error(err)});  
+    // ⚠️🔮
+
+    
+    var buffer = Buffer.from(str, 'binary');
+    console.log(buffer);
+    fs.writeFile(`${file_path}_buf`, buffer, err=> {if(err) console.error(err)});
+    // ⚠️💣 'binary' is a encoding type but not in a byte-to-byte copying way
+
+    
+    var buffer8 = Buffer.from(str,'utf8');
+    console.log(buffer8);
+    fs.writeFile(`${file_path}_buf8`, buffer8, err=> {if(err) console.error(err)});
+    // ⚠️🔮 [80:FF] to utf8
+
+
+    var buffer16 = Buffer.from(str,'utf16le');
+    console.log(buffer16);
+    fs.writeFile(`${file_path}_buf16`, buffer16, err=> {if(err) console.error(err)});
+    // ⚠️💎 [XX] + 00
+
+    var charCodeArray = [];
+    var codePointArray = [];
+    for(i = 0; i < str.length; i++){
+        charCodeArray.push(str.charCodeAt(i));  // ✔️
+        codePointArray.push(str.codePointAt(i));  // ✔️
+    }
+    // var charCode = new Buffer(charCodeArray);
+    // var codePoint = new Buffer(codePointArray);
+    var charCode = Buffer.from(charCodeArray);
+    var codePoint = Buffer.from(codePointArray);
+    fs.writeFile(`${file_path}_charCode[]`, charCodeArray, err=> {if(err) console.error(err)});
+    fs.writeFile(`${file_path}_codePoint[]`, codePointArray, err=> {if(err) console.error(err)});
+    fs.writeFile(`${file_path}_charCode`, charCode, err=> {if(err) console.error(err)});  // ⚠️💣
+    fs.writeFile(`${file_path}_codePoint`, codePoint, err=> {if(err) console.error(err)});  // ⚠️💣
+
+}
+
+
 (async function main(){
 
     /** @var {puppeteer.Browser} browser */
@@ -143,7 +187,7 @@ async function on_response(response){
     await page.setRequestInterception(true);
 
     page.on("request", on_interceptedRequest);
-    page.on('response', on_response);
+    // page.on('response', on_response);
     // intercepte response?
 
     await page.goto(cache.game.url);
