@@ -11,7 +11,7 @@ while(false){
     console.log(str)  // ⚠️ ÿÊú
     for(i=0; i<str.length; i++){
         console.log(str.charCodeAt(i));
-        console.log(str.codePointAt(i))
+        console.log(str.codePointAt(i));
     }
 
     /** @var {Buffer} buffer_r */
@@ -61,6 +61,9 @@ while(true){
         129,165,181,174,255,
         17
     ];
+    for(i=0; i<arr.length; i++){
+        console.log(arr[i].toString(16));
+    }
     var buff = Buffer.from(arr);  // ✔️
     console.log(buff);
     
@@ -69,18 +72,29 @@ while(true){
     var buff_r = fs.readFileSync(`.test/out_buff`)
     console.log(buff_r);  // ✔️ restored!
 
-    // var str = buff.toString('utf8')  // ❌ [655533] take buff as 'utf8' encoded
+
+    // var str = buff.toString('utf8') // ❌ [655533] if take buff as 'utf8' encoded, data loss is permanent!
+    //                                 // and, the str is  interpreted from the contect rather than the raw bytes in form of 'binary'
+    //                                 // intersting thing is that when write a 'utf8' encoded buff to a file, 
+    //                                 // the file bytes is in form of 'utf8', not an 'utf8'+'binary' combining decoded form.
+    //                                 // 'binary' is design as a lowest encoding method.
     var str = buff.toString('binary')  // ✔️
     for(i=0; i<str.length; i++){
-        console.log(str.charCodeAt(i));
+        console.log(str.charCodeAt(i).toString(16));
         // console.log(str.codePointAt(i));
     }
-    // fs.writeFileSync(`.test/out_str`, str, );  // ⚠️ utf8
-    fs.writeFileSync(`.test/out_str`, str, 'binary');   // ⚠️💣 so, 'binary' is not 'byte to byte' coding method
+    // fs.writeFileSync(`.test/out_str`, str);  // ⚠️🔮 utf8
+    fs.writeFileSync(`.test/out_str`, str, 'binary');   // ⚠️💣 so, 'binary' is not 'byte to byte' edcoding method
                                                         // 'binary' is an encoding method for Buffer
-                                                        // it's not raw byts arrray of the content, 
+                                                        // it's not raw bytes arrray of the content, 
                                                         // but act as raw bytes when read it,
                                                         // just as 'utf16le' for String.
+
+    // what if we read a file of raw bytes rather than in the encoding form of 'binary' ?
+    var raw = fs.readFileSync(`.test/raw`)  // ✔️ Buffer(7) [48, 129, 165, 181, 174, 255, 17] exactly!
+    console.log(raw);
+    fs.writeFileSync(`.test/out_raw`, raw); // ⚠️💣 now, it's encoded as 'binary'
+                                            // then how to decode 'binary'? fs and Buffer knows, I don't.
 
     break;
 }

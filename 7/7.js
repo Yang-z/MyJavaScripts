@@ -89,21 +89,21 @@ async function on_response(response){
         && response.headers().hasOwnProperty('content-type')
         && response.headers()['content-type'].search('amf') != -1
     ){
-        console.log(count);
-
         // req_body = response.request().postData();
-        // console.log(req_body);  // ❌ broken for amf
+        // console.log(req_body);
 
-        console.log(`content-length: ${response.headers()['content-length']}`)
+        // console.log(`content-length: ${response.headers()['content-length']}`)
 
-        var raw = await response.raw();  // ❌ already broken
-        var raw_buffer = Buffer.from(raw, 'binary');  // ❌ useless 
-        console.log(`buffer length: ${raw_buffer.length}`)
-        console.log(raw_buffer)
-        // fs.writeFile(`./7/.cache/amf/${count}_res`, raw_buffer, err=> {if(err) console.error(err)})
-
-        // buffer = await response.buffer();
-        // console.log(buffer);  // ❌ broken for amf
+        // var buffer = await response.buffer();
+        var raw = await response.raw();     // ❌ [655533] 
+                                            // happends when take buff('binary') as 'utf8' encoded,
+                                            // so, it seems `buff.toString('utf8')` is happened incorrectly
+        try{
+            parseBodyString(raw, "res");
+        }catch(e){
+            console.error(e);
+        }
+            
 
         /**⚠️
          * They are just not really raw date, see:
@@ -116,12 +116,6 @@ async function on_response(response){
          * https://gist.github.com/jsoverson/638b63542863596c562ccefc3ae52d8f
          */
         
-        // try{
-        //     // decode amf...
-        //     console.log(amf);
-        // }catch(error) {
-        //     console.error(error);;
-        // }
     }
     // response.request().continue()
 }
@@ -136,42 +130,42 @@ function parseBodyString(str, name){
     var dir = "./7/.cache/amf"
     var file_path = `${dir}/${name}_${count}`
 
-    console.log(str);
-    fs.writeFile(`${file_path}_str`, str, err=> {if(err) console.error(err)});  
-    // ⚠️🔮
+    // console.log(str);
+    // fs.writeFile(`${file_path}_str`, str, err=> {if(err) console.error(err)});  
+    // // ⚠️🔮
 
     
     var buffer = Buffer.from(str, 'binary');
-    console.log(buffer);
+    // console.log(buffer);
     fs.writeFile(`${file_path}_buf`, buffer, err=> {if(err) console.error(err)});
-    // ⚠️💣 'binary' is a encoding type but not in a byte-to-byte copying way
+    // ⚠️💣 'binary' is an encoding type but not in a byte-to-byte copying way
 
     
-    var buffer8 = Buffer.from(str,'utf8');
-    console.log(buffer8);
-    fs.writeFile(`${file_path}_buf8`, buffer8, err=> {if(err) console.error(err)});
-    // ⚠️🔮 [80:FF] to utf8
+    // var buffer8 = Buffer.from(str,'utf8');
+    // console.log(buffer8);
+    // fs.writeFile(`${file_path}_buf8`, buffer8, err=> {if(err) console.error(err)});
+    // // ⚠️🔮 [80:FF] to utf8
 
 
     var buffer16 = Buffer.from(str,'utf16le');
-    console.log(buffer16);
+    // console.log(buffer16);
     fs.writeFile(`${file_path}_buf16`, buffer16, err=> {if(err) console.error(err)});
     // ⚠️💎 [XX] + 00
 
-    var charCodeArray = [];
-    var codePointArray = [];
-    for(i = 0; i < str.length; i++){
-        charCodeArray.push(str.charCodeAt(i));  // ✔️
-        codePointArray.push(str.codePointAt(i));  // ✔️
-    }
-    // var charCode = new Buffer(charCodeArray);
-    // var codePoint = new Buffer(codePointArray);
-    var charCode = Buffer.from(charCodeArray);
-    var codePoint = Buffer.from(codePointArray);
-    fs.writeFile(`${file_path}_charCode[]`, charCodeArray, err=> {if(err) console.error(err)});
-    fs.writeFile(`${file_path}_codePoint[]`, codePointArray, err=> {if(err) console.error(err)});
-    fs.writeFile(`${file_path}_charCode`, charCode, err=> {if(err) console.error(err)});  // ⚠️💣
-    fs.writeFile(`${file_path}_codePoint`, codePoint, err=> {if(err) console.error(err)});  // ⚠️💣
+    // var charCodeArray = [];
+    // var codePointArray = [];
+    // for(i = 0; i < str.length; i++){
+    //     charCodeArray.push(str.charCodeAt(i));  // ✔️
+    //     codePointArray.push(str.codePointAt(i));  // ✔️
+    // }
+    // // var charCode = new Buffer(charCodeArray);
+    // // var codePoint = new Buffer(codePointArray);
+    // var charCode = Buffer.from(charCodeArray);
+    // var codePoint = Buffer.from(codePointArray);
+    // fs.writeFile(`${file_path}_charCode[]`, charCodeArray, err=> {if(err) console.error(err)});
+    // fs.writeFile(`${file_path}_codePoint[]`, codePointArray, err=> {if(err) console.error(err)});
+    // fs.writeFile(`${file_path}_charCode`, charCode, err=> {if(err) console.error(err)});  // ⚠️💣
+    // fs.writeFile(`${file_path}_codePoint`, codePoint, err=> {if(err) console.error(err)});  // ⚠️💣
 
 }
 
@@ -187,7 +181,7 @@ function parseBodyString(str, name){
     await page.setRequestInterception(true);
 
     page.on("request", on_interceptedRequest);
-    // page.on('response', on_response);
+    page.on('response', on_response);
     // intercepte response?
 
     await page.goto(cache.game.url);
