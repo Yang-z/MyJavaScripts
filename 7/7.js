@@ -95,9 +95,9 @@ async function on_response(response){
         // console.log(`content-length: ${response.headers()['content-length']}`)
 
         // var buffer = await response.buffer();
-        var raw = await response.raw();     // ❌ [655533] 
+        var raw = await response.raw();     // ❌ [655533] or [0xFFFD]
                                             // happends when take buff('binary') as 'utf8' encoded,
-                                            // so, it seems `buff.toString('utf8')` is happened incorrectly
+                                            // so, it seems `buff.toString('utf8')` has happened incorrectly somewhere
         try{
             parseBodyString(raw, "res");
         }catch(e){
@@ -112,7 +112,7 @@ async function on_response(response){
          * Raw response body is not avilable for current puppeteer api, see:
          * https://github.com/puppeteer/puppeteer/issues/1191
          * 
-         * A way to get raw response by using DTP, see:
+         * A way to get raw response by using CDP, see:
          * https://gist.github.com/jsoverson/638b63542863596c562ccefc3ae52d8f
          */
         
@@ -130,42 +130,33 @@ function parseBodyString(str, name){
     var dir = "./7/.cache/amf"
     var file_path = `${dir}/${name}_${count}`
 
-    // console.log(str);
-    // fs.writeFile(`${file_path}_str`, str, err=> {if(err) console.error(err)});  
-    // // ⚠️🔮
+    var buffer = Buffer.from(str, 'binary');    // ✔️    'binary'
+                                                // ⚠️🔮  'utf8'      [80:FF] to 'utf8'
+                                                // ⚠️💎  'utf16le'   [XX] + [00]
+    fs.writeFile(`${file_path}_buf`, buffer, err=> {if(err) console.error(err)});  
 
     
-    var buffer = Buffer.from(str, 'binary');
-    // console.log(buffer);
-    fs.writeFile(`${file_path}_buf`, buffer, err=> {if(err) console.error(err)});
-    // ⚠️💣 'binary' is an encoding type but not in a byte-to-byte copying way
+    while(false){
+        fs.writeFile(`${file_path}_str`, str, 'latin1', err=> {if(err) console.error(err)});
+        // ✔️   'latin1' or 'binary'
+        // ⚠️🔮 'utf8' as default   [80:FF] to 'utf8'
+        // ⚠️💎 'utf16le'           [XX] + [00]
 
-    
-    // var buffer8 = Buffer.from(str,'utf8');
-    // console.log(buffer8);
-    // fs.writeFile(`${file_path}_buf8`, buffer8, err=> {if(err) console.error(err)});
-    // // ⚠️🔮 [80:FF] to utf8
+        // for future test of dealing with big code point requiring 4 bytes in utf-16
+        var charCodeArray = [];
+        var codePointArray = [];
+        for(i = 0; i < str.length; i++){
+            charCodeArray.push(str.charCodeAt(i));  // ✔️
+            codePointArray.push(str.codePointAt(i));  // ✔️
+        }
+        var charCode = Buffer.from(charCodeArray);
+        var codePoint = Buffer.from(codePointArray);
 
-
-    var buffer16 = Buffer.from(str,'utf16le');
-    // console.log(buffer16);
-    fs.writeFile(`${file_path}_buf16`, buffer16, err=> {if(err) console.error(err)});
-    // ⚠️💎 [XX] + 00
-
-    // var charCodeArray = [];
-    // var codePointArray = [];
-    // for(i = 0; i < str.length; i++){
-    //     charCodeArray.push(str.charCodeAt(i));  // ✔️
-    //     codePointArray.push(str.codePointAt(i));  // ✔️
-    // }
-    // // var charCode = new Buffer(charCodeArray);
-    // // var codePoint = new Buffer(codePointArray);
-    // var charCode = Buffer.from(charCodeArray);
-    // var codePoint = Buffer.from(codePointArray);
-    // fs.writeFile(`${file_path}_charCode[]`, charCodeArray, err=> {if(err) console.error(err)});
-    // fs.writeFile(`${file_path}_codePoint[]`, codePointArray, err=> {if(err) console.error(err)});
-    // fs.writeFile(`${file_path}_charCode`, charCode, err=> {if(err) console.error(err)});  // ⚠️💣
-    // fs.writeFile(`${file_path}_codePoint`, codePoint, err=> {if(err) console.error(err)});  // ⚠️💣
+        fs.writeFile(`${file_path}_charCode[]`, charCodeArray, err=> {if(err) console.error(err)});
+        fs.writeFile(`${file_path}_codePoint[]`, codePointArray, err=> {if(err) console.error(err)});
+        fs.writeFile(`${file_path}_charCode`, charCode, err=> {if(err) console.error(err)});  // ✔️
+        fs.writeFile(`${file_path}_codePoint`, codePoint, err=> {if(err) console.error(err)});  // ✔️
+    }
 
 }
 

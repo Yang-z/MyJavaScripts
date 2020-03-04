@@ -64,37 +64,38 @@ while(true){
     for(i=0; i<arr.length; i++){
         console.log(arr[i].toString(16));
     }
-    var buff = Buffer.from(arr);  // ✔️
+    var buff = Buffer.from(arr);  // ✔️ 'binary'
     console.log(buff);
     
-    fs.writeFileSync(`.test/out_buff`, buff);   // ⚠️💣 not exact bytes, even specifies econding to 'binary'
-                                                // ⚠️💣 new Uint8Array(buff): not exact bytes
+    fs.writeFileSync(`.test/out_buff`, buff);   // ✔️
+
     var buff_r = fs.readFileSync(`.test/out_buff`)
     console.log(buff_r);  // ✔️ restored!
 
 
-    // var str = buff.toString('utf8') // ❌ [655533] if take buff as 'utf8' encoded, data loss is permanent!
-    //                                 // and, the str is  interpreted from the contect rather than the raw bytes in form of 'binary'
-    //                                 // intersting thing is that when write a 'utf8' encoded buff to a file, 
-    //                                 // the file bytes is in form of 'utf8', not an 'utf8'+'binary' combining decoded form.
-    //                                 // 'binary' is design as a lowest encoding method.
+    // var str = buff.toString('utf8') // ❌ [655533] or [0xFFFD] https://github.com/nodejs/node/issues/23280
+    //                                 // if take buff of 'binary' as 'utf8' encoded, data loss is permanent!
     var str = buff.toString('binary')  // ✔️
     for(i=0; i<str.length; i++){
         console.log(str.charCodeAt(i).toString(16));
         // console.log(str.codePointAt(i));
     }
-    // fs.writeFileSync(`.test/out_str`, str);  // ⚠️🔮 utf8
-    fs.writeFileSync(`.test/out_str`, str, 'binary');   // ⚠️💣 so, 'binary' is not 'byte to byte' edcoding method
-                                                        // 'binary' is an encoding method for Buffer
-                                                        // it's not raw bytes arrray of the content, 
-                                                        // but act as raw bytes when read it,
-                                                        // just as 'utf16le' for String.
+    // fs.writeFileSync(`.test/out_str`, str);  // ⚠️🔮 'utf8' by default
+    fs.writeFileSync(`.test/out_str`, str, 'binary');   // ✔️ 
 
-    // what if we read a file of raw bytes rather than in the encoding form of 'binary' ?
-    var raw = fs.readFileSync(`.test/raw`)  // ✔️ Buffer(7) [48, 129, 165, 181, 174, 255, 17] exactly!
+    // what if we read a file of raw bytes?
+    var raw = fs.readFileSync(`.test/raw`)  // ✔️ Buffer(7) [48, 129, 165, 181, 174, 255, 17]
     console.log(raw);
-    fs.writeFileSync(`.test/out_raw`, raw); // ⚠️💣 now, it's encoded as 'binary'
-                                            // then how to decode 'binary'? fs and Buffer knows, I don't.
+    fs.writeFileSync(`.test/out_raw`, raw); // ✔️
+
+    // 💣 conclusion:
+    // String in js uses 'utf16' only.
+    // 'binary' means raw bytes without any encoding in node.js,
+    // Write 'binary' buff into a file results in exactly same bytes.
+    // Tools for inspecting a binary file could show confusion results,
+    // if it is not configed correctly. 
+    // i.e Notepad++ (x86) with plug-in of HEX-Editor, see:
+    // https://github.com/nodejs/help/issues/2507
 
     break;
 }
