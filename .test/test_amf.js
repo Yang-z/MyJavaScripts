@@ -4,9 +4,7 @@ var buffer = fs.readFileSync(".test/amf")
 console.log(buffer)  // ✔️
 
 try{
-    const ByteArray = require('bytearray-node');
-    var ba = new ByteArray(buffer);
-    var amf = ba.readObject();  // undefined
+    
 }catch(e){
     console.error(e);
 }
@@ -14,6 +12,11 @@ console.log(amf);
 
 
 while(false){
+    // const ByteArray = require('bytearray-node');
+    // var ba = new ByteArray(buffer);
+    // var amf = ba.readObject();  // undefined
+    // // https://github.com/Zaseth/bytearray-node/issues/9#event-3100183963
+
     // var Decoder = require('node-amf3').Decoder;  // ❌
     // var decoder = new Decoder(buffer);
     // var amf = decoder.decode();
