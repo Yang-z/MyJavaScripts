@@ -33,7 +33,10 @@ Response.prototype.raw = function() {
 /** ********************************************************************** */
 
 const cache = JSON.parse(fs.readFileSync("./7/.cache/.json"));
-count = 0;
+var count = 0;
+
+var http_req = null;
+var http_req_amf = fs.readFileSync("./7/.cache/action/amf-add1").toString('binary');
 
 async function launch_browser(){
     return await puppeteer.launch({
@@ -59,21 +62,29 @@ async function launch_browser(){
  * @returns {null}
  */
 async function on_interceptedRequest(request){
-    if(
-        request.method() == 'POST'
-        && request.resourceType() == 'other'
+    if( request.url().endsWith('/amf')
+        // && request.method() == 'POST'
+        // && request.resourceType() == 'other'
+        // && request.headers().hasOwnProperty('content-type')
+        // && request.headers()['content-type'].includes('amf')
     ){
         console.log(++count);
         // console.log(request);
 
-        try{
-            parseBodyString(request.postData(), "req");
-        }catch(e){
-            console.error(e);
-        }
+        // try{
+        //     parseBodyString(request.postData(), "req");
+        // }catch(e){
+        //     console.error(e);
+        // }
         
         // response = request.response()
         // console.log(response);  // null
+        
+        if(http_req === null && count > 60){
+            http_req = saveRequest(request);
+        }
+
+
     };
     // interceptedRequest.abort();
     request.continue();
@@ -83,11 +94,11 @@ async function on_interceptedRequest(request){
  * @param {puppeteer.Response} response
  */
 async function on_response(response){
-    if( 
-        response.request().method() === "POST"
-        && response.request().resourceType() === 'other' 
-        && response.headers().hasOwnProperty('content-type')
-        && response.headers()['content-type'].search('amf') != -1
+    if( response.request().url().endsWith('/amf')
+        // && response.request().method() === "POST"
+        // && response.request().resourceType() === 'other' 
+        // && response.headers().hasOwnProperty('content-type')
+        // && response.headers()['content-type'].includes('amf')
     ){
         // req_body = response.request().postData();
         // console.log(req_body);
@@ -161,6 +172,9 @@ function parseBodyString(str, name){
 }
 
 
+
+
+
 (async function main(){
 
     /** @var {puppeteer.Browser} browser */
@@ -172,14 +186,76 @@ function parseBodyString(str, name){
     await page.setRequestInterception(true);
 
     page.on("request", on_interceptedRequest);
-    page.on('response', on_response);
+    // page.on('response', on_response);
     // intercepte response?
 
     await page.goto(cache.game.url);
+
+    // wait
+    {
+        console.log('wait 60s')
+        await new Promise(r => setTimeout(r, 30000));
+        console.log('wait 30s')
+        await new Promise(r => setTimeout(r, 15000));
+        console.log('wait 15s')
+        await new Promise(r => setTimeout(r, 15000));
+    }
+
+    if(http_req != null){
+        set_request(http_req.url, http_req.options, http_req_amf);
+    }
 
     await new Promise(r => setTimeout(r, 300000));
 
     await browser.close();
     console.log("async done.")
 
-})()
+})();
+
+
+/** ********************************************************************** */
+/** ********************************************************************** */
+var http=require('http');
+
+
+/**
+ * 
+ * @param {puppeteer.Request} pptr_req 
+ */
+function saveRequest(pptr_req){
+    var req = {
+        url: pptr_req.url(),
+        options: {}
+    }
+    req.options = {
+        method: pptr_req.method(),
+        headers: {}
+    };
+    for (const key of Object.keys(pptr_req.headers())){
+        req.options.headers[key] = pptr_req.headers()[key];
+    }
+    console.log(req);  // ❌ pptr seems not give us sufficient headers!
+    return req;
+}
+
+
+/**
+ * @param {String} url
+ * @param {Object} options 
+ * @param {String} contents 
+ */
+function set_request(url, options, contents){
+
+    options['headers']['content-length'] = contents.length;
+
+    var req=http.request(url, options,function(res){
+        console.log(res);
+        // res.setEncoding('utf-8');
+        // res.on('data',function(data){
+        //     console.log('http respond');
+        //     console.log(data);
+        // })
+    });
+    req.write(contents);
+    // req.end();
+}
